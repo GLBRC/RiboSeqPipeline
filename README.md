@@ -34,3 +34,13 @@ choose to install the Remote Development extension pack.
  prefix: /home/glbrc.org/mplace/.conda/envs/riboSeq should become ->
         prefix: /home/glbrc.org/USER/.conda/envs/riboSeq
 
+ Then to create the environment:  conda create -f RiboSeq_condaEnv.yml
+ This can then be used within your VS Code. 
+
+ 9) Open RiboSeq_pipeline.ipynb and walk through the pipeline.
+ Note that most steps will create condor submit files along with a shell script.
+ Just use scarcity-submit.glbrc.org and run condor_submit mySubmit.txt and wait for 
+ the job to finish before running the next step.
+
+ 
+
