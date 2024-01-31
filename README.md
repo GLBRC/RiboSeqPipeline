@@ -8,10 +8,9 @@ Designed used with MicroSoft VS Code and to be used with on GLBRC scarcity with 
 
 1) Download VS Code : https://code.visualstudio.com
 
-2) Make sure you have an OpenSSH compativle SSH Client installed locally. On MacOS this should be already be installed.
+2) Make sure you have an OpenSSH compatible SSH Client installed locally. On MacOS this should be already be installed.
 
-3) In VS Code install the Remote-SSH extension. If you plan to work with other remote extensions in VS Code, you may 
-choose to install the Remote Development extension pack.
+3) In VS Code install the Remote-SSH extension. If you plan to work with other remote extensions in VS Code, you may choose to install the Remote Development extension pack.
 
 4) In VS Code, select Remote-SSH: Connect to Host... from the Command Palette (F1, Ctrl+Shift+P) and use your user@hostname.
 
