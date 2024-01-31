@@ -1,0 +1,35 @@
+Download the non-coding RNA
+
+wget https://downloads.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz  
+
+--2023-12-04 16:10:45--  https://downloads.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz
+Resolving downloads.yeastgenome.org (downloads.yeastgenome.org)... 54.148.109.74, 54.148.130.184, 35.83.19.166, ...
+Connecting to downloads.yeastgenome.org (downloads.yeastgenome.org)|54.148.109.74|:443... connected.
+HTTP request sent, awaiting response... 302 Found
+Location: http://sgd-archive.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz [following]
+--2023-12-04 16:10:45--  http://sgd-archive.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz
+Resolving sgd-archive.yeastgenome.org (sgd-archive.yeastgenome.org)... 52.218.250.202, 52.92.129.211, 52.92.147.51, ...
+Connecting to sgd-archive.yeastgenome.org (sgd-archive.yeastgenome.org)|52.218.250.202|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 32119 (31K) [binary/octet-stream]
+Saving to: ‘rna_coding_R64-1-1_20110203.fasta.gz’
+
+100%[=========================================================================>] 32,119      --.-K/s   in 0.06s   
+
+2023-12-04 16:10:45 (530 KB/s) - ‘rna_coding_R64-1-1_20110203.fasta.gz’ saved [32119/32119]
+
+build bowtie2 index:
+
+    bowtie2-build rna_coding_R64-1-1_20110203.fasta rna_coding_R64-1-1
+
+
+Python Pickle files:
+
+S288C_chromSizes.pkl   -- S288C chromosome sizes dictionary 
+YPS1009_chromSizes.pkl -- YPS1009 chromosome sizes dictionary
+
+S288C_GeneBed.pkl      -- S288C gene bed file (all genes in the genome)
+YPS1009_GeneBed.pkl    -- YPS1009 gene bed file (all genes in the genome)
+
+
+
