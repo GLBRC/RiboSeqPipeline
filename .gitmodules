@@ -1,0 +1,3 @@
+[submodule "interval_tree"]
+	path = interval_tree
+	url = https://github.com/moonso/interval_tree/tree/master
