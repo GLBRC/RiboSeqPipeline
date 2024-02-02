@@ -108,7 +108,7 @@ def runFastqc():
 
     os.chmod('runFastqc.sh', 0o0777)
 
-def runCutadapt():
+def runCutAdapt():
     """runCutadapt
     
     Run cutadapt on fastq files using the parameters provided by Ezra Bio.
@@ -122,14 +122,14 @@ def runCutadapt():
     -o output.fastq.gz input.fastq.gz" - output name
     """    
     # write the cutadapt condor submit file
-    with open('cutadapt.submit', 'w') as submit:
+    with open('cutadapt.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runCutAdapt.sh\n")
-        submit.write( "Arguments                = $(fastqFile) $(outFastq)\n")
-        submit.write( "Error                    = cutadapt.submit.err\n")
-        submit.write( "Log                      = cutadapt.submit.log\n")  
+        submit.write( "Arguments                = $(infastq) $(outfastq)\n")
+        submit.write( "Error                    = cutadapt-$(job).submit.err\n")
+        submit.write( "Log                      = cutadapt-$(job).submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue fastqFile, outFastq from cutadaptInput.txt\n" )
+        submit.write( "Queue\n" )
     submit.close()
 
     # write shell script to run cutadapt
@@ -455,18 +455,19 @@ def main():
         cutadaptOutName = cutadaptOutDir + re.sub('.fastq', '-clean.fastq', os.path.basename(fsa.rstrip()))
         cutadaptJob = Job('cutadapt.jtf', 'job' + str(num))
         cutadaptJob.pre_skip(1)
-        cutadaptJob.add_var('infastq', fsa)
+        cutadaptJob.add_var('infastq', 'fastq/' + fsa)
         cutadaptJob.add_var('outfastq', cutadaptOutName)
         cutadaptJob.add_parent(fastqcJob)
         mydag.add_job(cutadaptJob)
         num += 1    
+        
     
 
     mydag.save('MasterDagman.dsf')      # write the dag submit file
     
     # write the required condor files
     runFastqc()
-                
+    runCutAdapt()
         
     
 
