@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 """RiboSeqPipeline.py
 
-Pipeline to align and count start sites for Ribo-Seq data.
+Pipeline to align and count start sites for Ribo-Seq data. Pipeline utilizes HTCondor Dagman 
+to manage jobs.
 
 Notes
 ----- 
-Put the fastq files in the parent directory within a parent directory called fastq.
+Put the fastq files in the parent directory within a directory called fastq.
+If data is paired-end only Read 1 is required.
+ 
+    ex:   MyProject
+            fastq
+                data_A_R1.fastq
+                data_B_R1.fastq
+                data_C_R1.fastq
 
 use the riboSeq environment: /home/glbrc.org/mplace/.conda/envs/riboSeq 
 
- RiboSeq processing pipeline
+RiboSeq processing pipeline Steps:
 
-Steps
-
-Run Fastqc to check the read length distribution. 
+    1) Fastqc to check the read length distribution. 
 
 Run cutadapt using the parameters provided by Ezrabio.  
 "-j 8 -g "^GGG" -a "A{10}" -n 2 -m 15 --max-n=0.1 --discard-casava -o output.fastq.gz input.fastq.gz"
@@ -42,6 +48,8 @@ f : str
 
 Example
 -------
+
+
     usage:
 
         RiboSeqPipeline.py -f fastqfiles.txt
@@ -76,16 +84,16 @@ YPS1009_RefGenome = '/home/glbrc.org/mplace/data/reference/YPS1009/YPS1009'
 def runFastqc():
     """runFastqc
     
-    write the fastqc condor submit file
+    write the fastqc condor submit and shell script files.
     """
-    with open('fastqc.submit', 'w') as submit:
+    with open('fastqc.jtf', 'w') as submit:
                 submit.write( "Universe                 = vanilla\n" )
                 submit.write( "Executable               = runFastqc.sh\n")
                 submit.write( "Arguments                = $(fastqFile)\n")
                 submit.write( "Error                    = fastqc.submit.err\n")
                 submit.write( "Log                      = fastqc.submit.log\n")  
                 submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-                submit.write( "Queue fastqFile from inputFastq.txt\n" )
+                submit.write( "Queue\n" )
     submit.close()  
 
     # write shell script to run fastqc
@@ -411,76 +419,6 @@ def writeCitations():
     
     pass
 
-def createInfoDictionary():
-    """createInfoDictionary
-    
-    Create information dictionaries for S288C
-    gff = '/mnt/bigdata/linuxhome/mplace/data/reference/S288C_reference_genome_R64-1-1_20110203/saccharomyces_cerevisiae_R64-1-1_20110208_noFasta.gff'
-    geneLookUp = {}    # dictionary of dictionaries key = chrom : {key = the -72 position of gene value = gene name }
-    gffDict = {}       # dictionary of dictionaries key = chrom : {key = {start : 0, end : 0, strand : '+'}
-    """
-    with open(gff, 'r') as g:
-        for line in g:
-            if line.startswith('#'):   # skip comment rows
-                continue
-            else:
-                dat = line.split('\t')
-                chrom = dat[0]
-                if chrom not in S288C_chromSizes:
-                    continue
-                if chrom not in geneLookUp:
-                    geneLookUp[chrom] = {}
-                # add chrom to gffDict
-                if chrom not in gffDict:
-                    gffDict[chrom] = {}
-                # identify genes
-                if dat[2] == 'gene':
-                    geneName = re.sub('ID=', '', dat[8].split(';')[0])
-                    # identify strand
-                    if dat[6] == '+':          # POSIIVE STRAND
-                        if int(dat[3]) < 72:          
-                            start = 0
-                        else:
-                            start = int(dat[3]) - 72
-                        if start not in geneLookUp:
-                            geneLookUp[chrom][start] = geneName
-                        else:
-                            print('Duplicate start ', geneName, geneLookUp[chrom][start])
-
-                        if not int(dat[4]) + 60 > S288C_chromSizes[chrom]:
-                            end   = int(dat[4]) + 60
-                        else:
-                            end = S288C_chromSizes[chrom]
-
-                        # add final gene info for positive strand 
-                        if geneName not in gffDict[chrom]:
-                            gffDict[chrom][geneName] = {'strand' : '+', 'start': start, 'end': end }
-                    else:                      # NEGATIVE STRAND
-                        if  int(dat[3]) - 60 < 60:
-                            start = 0
-                        else:
-                            start = int(dat[3]) - 60
-                        if start not in geneLookUp:
-                            geneLookUp[chrom][start] = geneName
-                        else:
-                            print('Duplicate start minus strand ', geneName, geneLookUp[chrom][start]) 
-
-                        if not int(dat[4]) + 72 > S288C_chromSizes[chrom]:
-                            end = int(dat[4]) + 72
-                        else:
-                            end = S288C_chromSizes[chrom]
-                        # add final gene info for positive strand 
-                        if geneName not in gffDict[chrom]:
-                            gffDict[chrom][geneName] = {'strand' : '-', 'start': start, 'end': end }
-
-    # write bed file for use with Samtools  -l flag, start and end positions have been adjust -72 from start and + 60 to end
-    # track name=yeast_genes description="All S.cerevisiae Gene locations"
-    with open('S288C-Genes.bed', 'w') as out:
-        out.write('track name=yeast_genes description="All S.cerevisiae Gene locations"\n')
-        for chrom in gffDict.keys():
-            for gene, dat in gffDict[chrom].items():
-                out.write(f'{chrom} {gffDict[chrom][gene]["start"]} {gffDict[chrom][gene]["end"]} {gene} {gffDict[chrom][gene]["strand"]}\n')
-
 def main():
     
     cmdparser = argparse.ArgumentParser(description="Ribo-Seq pipeline, produces alignments and counts.",
@@ -507,8 +445,27 @@ def main():
         os.mkdir(parentDir + 'alignments/S288C')
         os.mkdir(parentDir + 'alignments/YPS1009') 
 
+    # create Dagfile object, utilize HTCondor Dagman to manage pipeline.
+    mydag = Dagfile()
+    num = 1
+
+    # Set up Dagman jobs for each input fastq file
+    for fsa in fastqLst:
+        # 1st step run fastqc
+        fastqcJob = Job('fastqc.jtf', 'job' + str(num))   
+        fastqcJob.pre_skip(1)
+        fastqcJob.add_var('fastq', 'fastq/' + fsa)
+        mydag.add_job(fastqcJob)
+        num += 1
+
     
     
+    
+
+    mydag.save('MasterDagman.dsf')      # write the dag submit file
+    
+    # write the required condor files
+    runFastqc()
                 
         
     
