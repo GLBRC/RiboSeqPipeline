@@ -112,31 +112,16 @@ def runCutadapt():
     """runCutadapt
     
     Run cutadapt on fastq files using the parameters provided by Ezra Bio.
-    -j 8 
-    -g "^GGG" 
-    -a "A{10}" 
-    -n 2 
-    -m 15 
-    --max-n=0.1 
-    --discard-casava 
-    -o output.fastq.gz input.fastq.gz" .
-    """
-    # setup input file for cutadapt
-    cutadaptOutDir = parentDir + 'cutadapt/'
-    if os.path.exists(cutadaptOutDir):
-        print("Directory exists.")
-    else:
-        os.mkdir(cutadaptOutDir)
-
-    with open('inputFastq.txt', 'r') as f, open('cutadaptInput.txt', 'w') as out:
-        for fstq in f:
-            fstqName = re.sub('.fastq', '-clean.fastq', os.path.basename(fstq.rstrip()))
-            fstqOutName = cutadaptOutDir + fstqName
-            out.write(f'{fstq.rstrip()} {fstqOutName}\n')
-    f.close()
-    out.close()
-    
-        # write the cutadapt condor submit file
+    -j 8                - number of cores
+    -g "^GGG"           - Sequence of an adapter ligated to the 5' end
+    -a "A{10}"          - Sequence of an adapter ligated to the 3' end
+    -n 2                - Remove up to "x" adapters from each read, 2 in our case
+    -m 15               - Discard reads shorter than 15 bp
+    --max-n=0.1         - Discard reads with more than COUNT 'N' bases, 0.1 is % of read length
+    --discard-casava    - Discard reads that did not pass CASAVA filtering
+    -o output.fastq.gz input.fastq.gz" - output name
+    """    
+    # write the cutadapt condor submit file
     with open('cutadapt.submit', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runCutAdapt.sh\n")
@@ -438,12 +423,20 @@ def main():
         with open(fastqFile, 'r') as f:
             for ln in f:
                 fastqLst.append(ln.rstrip())
+                
+    # setup output dirs for cutadapt
+    cutadaptOutDir = parentDir + 'cutadapt/'
+    if not os.path.exists(cutadaptOutDir):
+        os.mkdir(cutadaptOutDir)             
                
-    # create output files for genome alignments
+    # create output dirs for genome alignments
     if not os.path.exists(parentDir + 'alignments'):
         os.mkdir(parentDir + 'alignments')
         os.mkdir(parentDir + 'alignments/S288C')
         os.mkdir(parentDir + 'alignments/YPS1009') 
+        
+
+
 
     # create Dagfile object, utilize HTCondor Dagman to manage pipeline.
     mydag = Dagfile()
@@ -457,9 +450,16 @@ def main():
         fastqcJob.add_var('fastq', 'fastq/' + fsa)
         mydag.add_job(fastqcJob)
         num += 1
-
-    
-    
+        
+        # 2nd step run cutadapt
+        cutadaptOutName = cutadaptOutDir + re.sub('.fastq', '-clean.fastq', os.path.basename(fsa.rstrip()))
+        cutadaptJob = Job('cutadapt.jtf', 'job' + str(num))
+        cutadaptJob.pre_skip(1)
+        cutadaptJob.add_var('infastq', fsa)
+        cutadaptJob.add_var('outfastq', cutadaptOutName)
+        cutadaptJob.add_parent(fastqcJob)
+        mydag.add_job(cutadaptJob)
+        num += 1    
     
 
     mydag.save('MasterDagman.dsf')      # write the dag submit file
