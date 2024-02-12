@@ -87,8 +87,8 @@ def runFastqc():
                 submit.write( "Universe                 = vanilla\n" )
                 submit.write( "Executable               = runFastqc.sh\n")
                 submit.write( "Arguments                = $(fastqFile)\n")
-                submit.write( "Error                    = fastqc.$(job).err\n")
-                submit.write( "Log                      = fastqc.$(job).log\n")  
+                submit.write( "Error                    = log/fastqc.$(job).err\n")
+                submit.write( "Log                      = log/fastqc.$(job).log\n")  
                 submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
                 submit.write( "Queue\n" )
     submit.close()  
@@ -123,8 +123,8 @@ def runCutAdapt():
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runCutAdapt.sh\n")
         submit.write( "Arguments                = $(infastq) $(outfastq)\n")
-        submit.write( "Error                    = cutadapt-$(job).submit.err\n")
-        submit.write( "Log                      = cutadapt-$(job).submit.log\n")  
+        submit.write( "Error                    = log/cutadapt-$(job).submit.err\n")
+        submit.write( "Log                      = log/cutadapt-$(job).submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
         submit.write( "Queue\n" )
     submit.close()
@@ -140,6 +140,32 @@ def runCutAdapt():
     out.close()
 
     os.chmod('runCutAdapt.sh', 0o0777)
+
+def runRemoveFirst():
+    """runRemoveFirst
+    
+    write the condor submit and shell script files to run removeFirstBase.py.
+    """
+    with open('rmFirst.jtf', 'w') as submit:
+                submit.write( "Universe                 = vanilla\n" )
+                submit.write( "Executable               = runRmFirst.sh\n")
+                submit.write( "Error                    = log/rmFirst.$(job).err\n")
+                submit.write( "Log                      = log/rmFirst.$(job).log\n")  
+                submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
+                submit.write( "Queue\n" )
+    submit.close()  
+
+    # write shell script to run fastqc
+    with open('runRmFirst.sh', 'w') as out:
+        out.write("#!/bin/bash\n")
+        out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
+        out.write("unset PYTHONPATH\n")  
+        out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
+        out.write("/home/glbrc.org/mplace/scripts/riboSeqPipeline/removeFirstBase.py\n")
+        out.write("conda deactivate")
+    out.close()
+
+    os.chmod('runRmFirst.sh', 0o0777)
 
 def alignNonCoding():
     """alignNonCoding
@@ -406,7 +432,11 @@ def main():
     # setup output dirs for cutadapt
     cutadaptOutDir = parentDir + 'cutadapt/'
     if not os.path.exists(cutadaptOutDir):
-        os.mkdir(cutadaptOutDir)             
+        os.mkdir(cutadaptOutDir)
+               
+    logDir = parentDir + 'log/'
+    if not os.path.exists(logDir):
+        os.mkdir(logDir)     
                
     # create output dirs for genome alignments
     if not os.path.exists(parentDir + 'alignments'):
@@ -438,6 +468,12 @@ def main():
         mydag.add_job(cutadaptJob)
         num += 1    
         
+        # 3rd step run removeFirstBase
+        rmJob = Job('rmFirst.jtf', 'job' + str(num))
+        rmJob.pre_skip(1)
+        rmJob.add_parent(cutadaptJob)
+        mydag.add_job(rmJob)
+        num += 1 
     
 
     mydag.save('MasterDagman.dsf')      # write the dag submit file
@@ -445,6 +481,7 @@ def main():
     # write the required condor files
     runFastqc()
     runCutAdapt()
+    runRemoveFirst()
         
     
 
