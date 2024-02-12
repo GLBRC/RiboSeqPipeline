@@ -171,48 +171,34 @@ def alignNonCoding():
     """alignNonCoding
     
     """
-    # Step 4 ) Align reads with Bowtie2 to non-coding RNA, 
-    # https://downloads.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz 
+    # Align reads with Bowtie2 to non-coding RNA, 
+    # Non-coding RNA is from SGD genome version R64-1-1 
     # reads that align will be discarded.  Allow 1 mismatch in bowtie2 alignment.
     # bowtie2 -p 8 --phred33 -N 1 -x $REFERENCE -U $file -S $out.sam 
     # -p number of threads
     # -N Sets the number of mismatches
     # -x The basename of the index for the reference genome
     # -U file to align (unpaired)
-    # -S File to write SAM alignments to
-
-    # setup input file for bowtie2 alignment to non-coding RNA
-    nonCodingOutDir = parentDir + 'alignNonCodingRNA/'
-    if os.path.exists(nonCodingOutDir):
-        print("Directory exists.")
-    else:
-            os.mkdir(nonCodingOutDir)
-
-    # get a list of cutadapt cleaned & filtered fastq files for alignment
-    with open('alignmentInput.txt', 'w') as out:
-        for cleanfstq in glob.glob(cutadaptOutDir + '*-filt.fastq'):
-            samFile = re.sub('cutadapt', 'alignNonCodingRNA', re.sub('-filt.fastq', '.sam', cleanfstq))        
-            out.write(cleanfstq + ' ' + samFile + '\n')
-    out.close()
+    # -S File to write SAM alignments
     
-        # write the bowtie2 condor submit file
-    with open('ncbowtie2.submit', 'w') as submit:
+    # write the bowtie2 condor submit file
+    with open('ncbowtie2.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runncBowtie2.sh\n")
-        submit.write( "Arguments                = $(fastqFile) $(sam)\n")
-        submit.write( "Error                    = ncbowtie2.submit.err\n")
-        submit.write( "Log                      = ncbowtie2.submit.log\n")  
+        submit.write( "Arguments                = $(ncFastq) $(sam)\n")
+        submit.write( "Error                    = log/ncbowtie2.submit.err\n")
+        submit.write( "Log                      = log/ncbowtie2.submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue fastqFile, sam from alignmentInput.txt\n" )
+        submit.write( "Queue\n" )
     submit.close()
 
-    # write shell script to run cutadapt
+    # write shell script to run bowtie2
     with open('runncBowtie2.sh', 'w') as out:
         out.write("#!/bin/bash\n")
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
         out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("bowtie2 -p 8 --phred33 -N 1 -x /mnt/bigdata/linuxhome/mplace/scripts/riboseq/reference/rna_coding_R64-1-1 -U $1 -S $2\n")
+        out.write("bowtie2 -p 8 --phred33 -N 1 -x /mnt/bigdata/linuxhome/mplace/scripts/riboSeqPipeline/reference/rna_coding_R64-1-1 -U $1 -S $2\n")
         out.write("conda deactivate")
     out.close()
 
@@ -234,9 +220,9 @@ def removeNonCoding():
     
     # write the samtools filter UNMAPPED (reads which did not align to Non-Coding RNA) reads condor submit file
     # these reads will be aligned to S288C and YPS1009
-    with open('filter.submit', 'w') as submit:
+    with open('filterNC.jtf, 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
-        submit.write( "Executable               = runfilter.sh\n")
+        submit.write( "Executable               = runfilterNC.sh\n")
         submit.write( "Arguments                = $(sam) $(ncsam)\n")
         submit.write( "Error                    = filter.submit.err\n")
         submit.write( "Log                      = filter.submit.log\n")  
@@ -245,7 +231,7 @@ def removeNonCoding():
     submit.close()
 
     # write shell script to run 
-    with open('runfilter.sh', 'w') as out:
+    with open('runfilterNC.sh', 'w') as out:
         out.write("#!/bin/bash\n")
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
@@ -254,7 +240,7 @@ def removeNonCoding():
         out.write("conda deactivate")
     out.close()
 
-    os.chmod('runfilter.sh', 0o0777)
+    os.chmod('runfilterNC.sh', 0o0777)
 
     # Create new fastq files by filtering for reads that DID NOT ALIGN to the Non-Coding RNA
     # First create a new file containing the read names (for reads we want to keep)
@@ -437,7 +423,12 @@ def main():
     logDir = parentDir + 'log/'
     if not os.path.exists(logDir):
         os.mkdir(logDir)     
-               
+
+    # setup input file for bowtie2 alignment to non-coding RNA
+    nonCodingOutDir = parentDir + 'alignNonCodingRNA/'
+    if not os.path.exists(nonCodingOutDir):
+        os.mkdir(nonCodingOutDir)
+
     # create output dirs for genome alignments
     if not os.path.exists(parentDir + 'alignments'):
         os.mkdir(parentDir + 'alignments')
@@ -474,6 +465,23 @@ def main():
         rmJob.add_parent(cutadaptJob)
         mydag.add_job(rmJob)
         num += 1 
+        
+        # 4th step run align reads to Non-coding RNA
+        ncInputFastq = cutadaptOutDir + re.sub('.fastq', '-filt.fastq', fsa)
+        ncSamOut     = nonCodingOutDir + re.sub('.fastq', '.sam', fsa)
+        alignNCJob = Job('ncbowtie2.jtf', 'job' + str(num))
+        alignNCJob.pre_skip(1)
+        alignNCJob.add_var('ncFastq', ncInputFastq)
+        alignNCJob.add_var('sam', ncSamOut)
+        alignNCJob.add_parent(rmJob)
+        mydag.add_job(alignNCJob)
+        num += 1 
+        
+        # 5th step filter the Non-Coding alignments
+        ncFilterJob = Job('filterNC.jtf', 'job' + str(num))
+        
+        
+        
     
 
     mydag.save('MasterDagman.dsf')      # write the dag submit file
@@ -482,6 +490,7 @@ def main():
     runFastqc()
     runCutAdapt()
     runRemoveFirst()
+    alignNonCoding()
         
     
 
