@@ -48,8 +48,6 @@ f : str
 
 Example
 -------
-
-
     usage:
 
         RiboSeqPipeline.py -f fastqfiles.txt
@@ -64,7 +62,6 @@ References
 
 """
 import argparse 
-import itertools
 import os
 import pickle 
 import re
@@ -90,8 +87,8 @@ def runFastqc():
                 submit.write( "Universe                 = vanilla\n" )
                 submit.write( "Executable               = runFastqc.sh\n")
                 submit.write( "Arguments                = $(fastqFile)\n")
-                submit.write( "Error                    = fastqc.submit.err\n")
-                submit.write( "Log                      = fastqc.submit.log\n")  
+                submit.write( "Error                    = fastqc.$(job).err\n")
+                submit.write( "Log                      = fastqc.$(job).log\n")  
                 submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
                 submit.write( "Queue\n" )
     submit.close()  
@@ -102,7 +99,7 @@ def runFastqc():
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
         out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("fastqc $1\n")
+        out.write("/home/glbrc.org/mplace/scripts/riboSeqPipeline/runFastqc.py -f $1\n")
         out.write("conda deactivate")
     out.close()
 
@@ -143,24 +140,6 @@ def runCutAdapt():
     out.close()
 
     os.chmod('runCutAdapt.sh', 0o0777)
-
-def removeFirstBase():
-    """removeFirstBase
-    Remove reads where the first position quality score is <=10
-        """
-    qualScores = ['+', '*', ')','(', "'", '&', '%', '$', '#', '"', '!']
-    for fastq in glob.glob('cutadapt/*-clean.fastq'):
-        name = re.sub('-clean.fastq', '-filt.fastq', fastq)
-        with open(fastq, 'r') as f, open(name, 'w') as out:
-            for hdr, seq, plus, qual in itertools.zip_longest(*[f]*4):
-                firstQual = [*qual][0]
-                if not firstQual in qualScores:
-                    out.write(hdr)
-                    out.write(seq)
-                    out.write(plus)
-                    out.write(qual)
-                else:
-                    print(hdr, '  ', qual)
 
 def alignNonCoding():
     """alignNonCoding
@@ -434,9 +413,6 @@ def main():
         os.mkdir(parentDir + 'alignments')
         os.mkdir(parentDir + 'alignments/S288C')
         os.mkdir(parentDir + 'alignments/YPS1009') 
-        
-
-
 
     # create Dagfile object, utilize HTCondor Dagman to manage pipeline.
     mydag = Dagfile()
@@ -447,7 +423,8 @@ def main():
         # 1st step run fastqc
         fastqcJob = Job('fastqc.jtf', 'job' + str(num))   
         fastqcJob.pre_skip(1)
-        fastqcJob.add_var('fastq', 'fastq/' + fsa)
+        fastqcJob.add_var('fastqFile', 'fastq/' + fsa)
+        fastqcJob.add_var('job', 'job' +  str(num))
         mydag.add_job(fastqcJob)
         num += 1
         
