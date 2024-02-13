@@ -6,7 +6,7 @@ Remove the first base in each read if the is low. Low defined as a Q score <= 10
 
 Notes
 -----
-Runs in the current directory and globs the file names in the cutadapt directory.
+Runs in the current directory and using the *-clean.fastq files in the cutadapt directory.
 
 Parameters
 ----------
@@ -40,17 +40,30 @@ def removeFirstBase(fastq):
                 out.write(seq)
                 out.write(plus)
                 out.write(qual)
-            else:
-                print(hdr, '  ', qual)    
 
 def main():
     cmdparser = argparse.ArgumentParser(description="Remove first base for each read in fastq files if Q <= 10.",
                                         usage='%(prog)s ' ,prog='removeFirstBase.py'  )
+    cmdparser.add_argument('-f', '--fastq', action='store', dest='FASTQ', 
+                           help='Fastq file to filter by first base.', metavar='')
     cmdResults = vars(cmdparser.parse_args())
     
+    # if no args print help
+    if len(sys.argv) == 1:
+        print("")
+        cmdparser.print_help()
+        sys.exit(1)
+    
+    # get command line arg
+    if cmdResults['FASTQ'] is not None:
+        fastq = cmdResults['FASTQ']
+    else:
+        print('Required fastq file missing.')
+        cmdparser.print_help()
+        sys.exit()    
+    
     # get the fastq files in the cutadapt directory.
-    for fastq in glob.glob('cutadapt/*-clean.fastq'):
-        removeFirstBase(fastq)
+    removeFirstBase(fastq)
 
 if __name__ == "__main__":
     main()
