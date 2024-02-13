@@ -208,24 +208,15 @@ def removeNonCoding():
     """removeNonCoding
     -F --exclude-flags FLAG ,     Do not output alignments with any bits set in FLAG present in the FLAG field.
     in this case we exclude the reads which did not align to the Non-coding RNA i.e. the reads we want to analyze later.
-    """
-    # get a list of reads which aligned to Non-Coding RNA and remove them from the clean.fastq files
-    #samtools view -F 4 -u  -O SAM -o mapped.sam TestSample1.sam
-    with open('filterSamInput.txt', 'w') as out:
-        for sam in glob.glob(nonCodingOutDir + '*.sam'):
-            sampleName = re.sub('.sam', '', os.path.basename(sam))
-            outSam = nonCodingOutDir + sampleName + '-unmapped.sam'
-            out.write(sam + ' ' + outSam + '\n')
-    out.close()
-    
+    """   
     # write the samtools filter UNMAPPED (reads which did not align to Non-Coding RNA) reads condor submit file
     # these reads will be aligned to S288C and YPS1009
-    with open('filterNC.jtf, 'w') as submit:
+    with open('filterNC.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runfilterNC.sh\n")
-        submit.write( "Arguments                = $(sam) $(ncsam)\n")
-        submit.write( "Error                    = filter.submit.err\n")
-        submit.write( "Log                      = filter.submit.log\n")  
+        submit.write( "Arguments                = $(ncsam) $(outsam)\n")
+        submit.write( "Error                    = log/filter.submit.err\n")
+        submit.write( "Log                      = log/filter.submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
         submit.write( "Queue sam, ncsam from filterSamInput.txt\n" )
     submit.close()
@@ -479,10 +470,12 @@ def main():
         
         # 5th step filter the Non-Coding alignments
         ncFilterJob = Job('filterNC.jtf', 'job' + str(num))
-        
-        
-        
-    
+        ncFilterJob.pre_skip(1)
+        ncFilterJob.add_var('ncSam', ncSamOut)
+        ncFilterJob.add_var()
+        ncFilterJob.add_parent(alignNCJob)
+        mydag.add_job(ncFilterJob)
+        num += 1    
 
     mydag.save('MasterDagman.dsf')      # write the dag submit file
     
