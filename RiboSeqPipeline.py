@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """RiboSeqPipeline.py
 
-Pipeline to align and count start sites for Ribo-Seq data. Pipeline utilizes HTCondor Dagman 
-to manage jobs.
+Pipeline to align and count start sites for Ribo-Seq data. 
+Pipeline utilizes HTCondor Dagman to manage jobs.
 
 Notes
 ----- 
 Put the fastq files in the parent directory within a directory called fastq.
-If data is paired-end only Read 1 is required.
+If data is paired-end only Read 1 is required, do not include these files.
  
     ex:   MyProject
             fastq
@@ -15,37 +15,37 @@ If data is paired-end only Read 1 is required.
                 data_B_R1.fastq
                 data_C_R1.fastq
 
-use the riboSeq environment: /home/glbrc.org/mplace/.conda/envs/riboSeq 
-
-RiboSeq processing pipeline Steps:
-
-    1) Fastqc to check the read length distribution. 
-
-Run cutadapt using the parameters provided by Ezrabio.  
-"-j 8 -g "^GGG" -a "A{10}" -n 2 -m 15 --max-n=0.1 --discard-casava -o output.fastq.gz input.fastq.gz"
-
-Remove reads where the first position quality score is <=10
-
-Align reads with Bowtie to non-coding RNA, 
-https://downloas.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz 
-reads that align will be discarded. 
-
-Allow 1 mismatch in bowtie alignment.
-
 Alignment files (SAM/BAM) provide forward/reverse alignment information is provided by the Sam Flag.   
     0 is read aligned in the Fwd direction
     4 is read unaligned
     16 is read aligned in the Rvs direction
 
-Align the remaining reads with Bowtie to YPS1009 and S288C reference genomes.Run samtools mpileup to generate base counts for all genes in YPS1009 and S288C.
+use the riboSeq environment: /home/glbrc.org/mplace/.conda/envs/riboSeq 
+
 
 Method
 ------
+
+RiboSeq processing pipeline Steps:
+
+    1) Fastqc to check the read length distribution. 
+
+    2) Run cutadapt using the parameters provided by Ezrabio.  
+    
+    "-j 8 -g "^GGG" -a "A{10}" -n 2 -m 15 --max-n=0.1 --discard-casava -o output.fastq.gz input.fastq.gz"
+
+    3) Remove reads where the first position quality score is <=10
+
+    4) Align reads with Bowtie to non-coding RNA, reads that align will be discarded. 
+        https://downloas.yeastgenome.org/sequence/S288C_reference/rna/archive/rna_coding_R64-1-1_20110203.fasta.gz 
+        
+    5) Align remaining reads to reference genome allowing 1 mismatch in the bowtie2 alignment.
     
 Parameters
 ----------
 f : str
-    A text file with a list of fastq files to process. Only read 1 if paired-end data.
+    A text file with a list of fastq files to process. Only the forward read is 
+    required if you have paired-end data.
 
 Example
 -------
@@ -58,9 +58,6 @@ Requirements
 
     1. HTCondor, specifically GLBRC scarcity compute cluster.
 
-References
-----------
-
 """
 import argparse 
 import os
@@ -71,7 +68,6 @@ import sys
 from pydagman.dagfile import Dagfile
 from pydagman.job import Job
 from interval_tree import IntervalTree
-
 
 parentDir = os.getcwd() + '/'
 resourceDir = '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/'
@@ -187,7 +183,7 @@ def alignNonCoding():
     with open('ncbowtie2.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runncBowtie2.sh\n")
-        submit.write( "Arguments                = $(ncFastq) $(sam)\n")
+        submit.write( "Arguments                = $(ncFastq) $(sam) $(unaligned)\n")
         submit.write( "Error                    = log/ncbowtie2.submit.err\n")
         submit.write( "Log                      = log/ncbowtie2.submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
@@ -200,41 +196,11 @@ def alignNonCoding():
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
         out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("bowtie2 -p 8 --phred33 -N 1 -x /mnt/bigdata/linuxhome/mplace/scripts/riboSeqPipeline/reference/rna_coding_R64-1-1 -U $1 -S $2\n")
+        out.write("bowtie2 -p 8 --phred33 -N 1 -x /mnt/bigdata/linuxhome/mplace/scripts/riboSeqPipeline/reference/rna_coding_R64-1-1 -U $1 -S $2 --un $3\n")
         out.write("conda deactivate")
     out.close()
 
     os.chmod('runncBowtie2.sh', 0o0777)
-
-def removeNonCoding():
-    """removeNonCoding
-    -f, (--require-flags FLAG   ...have all of the FLAGs present)
-    Do not output alignments with any bits set in FLAG present in the FLAG field, 
-    only select unaligned reads, sam flag "4", i.e. the reads we want to analyze later.
-    """   
-    # write the samtools filter UNMAPPED submit file 
-    # these reads will be aligned to reference genome.
-    with open('filterNC.jtf', 'w') as submit:
-        submit.write( "Universe                 = vanilla\n" )
-        submit.write( "Executable               = runfilterNC.sh\n")
-        submit.write( "Arguments                = $(ncSam) $(unaligned)\n")
-        submit.write( "Error                    = log/filter.submit.err\n")
-        submit.write( "Log                      = log/filter.submit.log\n")  
-        submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue\n" )
-    submit.close()
-
-    # write shell script to run 
-    with open('runfilterNC.sh', 'w') as out:
-        out.write("#!/bin/bash\n")
-        out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
-        out.write("unset PYTHONPATH\n")  
-        out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("/mnt/bigdata/linuxhome/mplace/scripts/riboSeqPipeline/removeNonCoding.py -s $1 -o $2\n")
-        out.write("conda deactivate")
-    out.close()
-
-    os.chmod('runfilterNC.sh', 0o0777)    
 
 def alignBowtie():
     """alignBowtie
@@ -437,24 +403,20 @@ def main():
         # 4th step run align reads to Non-coding RNA
         ncInputFastq = cutadaptOutDir + re.sub('.fastq', '-filt.fastq', fsa)
         ncSamOut     = nonCodingOutDir + re.sub('.fastq', '.sam', fsa)
+        unalignedSam = nonCodingOutDir + re.sub('.fastq', '-unaligned.fastq', fsa )
         alignNCJob = Job('ncbowtie2.jtf', 'job' + str(num))
         alignNCJob.pre_skip(1)
         alignNCJob.add_var('ncFastq', ncInputFastq)
         alignNCJob.add_var('sam', ncSamOut)
+        alignNCJob.add_var('unaligned', unalignedSam)
         alignNCJob.add_parent(rmJob)
         mydag.add_job(alignNCJob)
         num += 1 
         
-        # 5th step filter the Non-Coding alignments
-        unaligned = re.sub('.sam', '-unaligned.fastq', ncSamOut)
-        ncFilterJob = Job('filterNC.jtf', 'job' + str(num))
-        ncFilterJob.pre_skip(1)
-        ncFilterJob.add_var('ncSam', ncSamOut)
-        ncFilterJob.add_var('unaligned', unaligned)
-        ncFilterJob.add_parent(alignNCJob)
-        mydag.add_job(ncFilterJob)
-        num += 1    
-
+        
+        
+        
+            
     mydag.save('MasterDagman.dsf')      # write the dag submit file
     
     # write the required condor files
