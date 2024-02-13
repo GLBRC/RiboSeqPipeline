@@ -32,6 +32,7 @@ import sys
 # Create new fastq files by filtering for reads that DID NOT ALIGN to the Non-Coding RNA
 # First create a new file containing the read names (for reads we want to keep)
 # nonCodingOutDir
+'''
 for unmapped in glob.glob(nonCodingOutDir + '*-unmapped.sam'):
     nameFile = re.sub('-unmapped.sam', '', os.path.basename(unmapped))
     outFile  = parentDir + 'alignments/' + nameFile + '-names.txt'
@@ -55,14 +56,15 @@ for fstq in glob.glob(cutadaptOutDir + '*-filt.fastq'):
     with open(outFile, 'w') as out:
         out.write(output[0].decode('utf-8'))
     out.close() 
+'''
 
 def main():
     cmdparser = argparse.ArgumentParser(description="Create new fastq files using reads NOT aligned to reference NON-CODING rna.",
-                                        usage='%(prog)s ' ,prog='removeNonCoding.py'  )
-    cmdparser.add_argument('-s', '--sam', action='store', dest='SAM', 
+                                        usage='%(prog)s  ' ,prog='removeNonCoding.py'  )
+    cmdparser.add_argument('-s', '--sam', action='store', dest='SAM',
                            help='Sam file to filter for unaligned reads', metavar='')
-    cmdparser.add_argument('-o', '--output', action='store', dest='OUT', 
-                           help='Output fastq file, where reads are taken from input sam file.')
+    cmdparser.add_argument('-o', '--output', action='store', dest='OUT',
+                           help='Output fastq file, where reads are taken from input sam file.', metavar='')
     cmdResults = vars(cmdparser.parse_args())
     
     # if no args print help
@@ -86,13 +88,10 @@ def main():
         cmdparser.print_help()
         sys.exit(1)
         
-    print(inSame)
+    print("\n\n")
+    print(inSam)
     print(outFile)
         
-    
         
-    
-    
-    
-    if __name__ == "__main__":
+if __name__ == "__main__":
     main()
