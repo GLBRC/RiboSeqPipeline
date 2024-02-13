@@ -72,8 +72,8 @@ from interval_tree import IntervalTree
 parentDir = os.getcwd() + '/'
 resourceDir = '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/'
 # bowtie2 reference for genomes
-S288C_RefGenome = '/home/glbrc.org/mplace/data/reference/S288C_reference_genome_R64-1-1_20110203/s.cerevisiae-R64-1-1' 
-YPS1009_RefGenome = '/home/glbrc.org/mplace/data/reference/YPS1009/YPS1009'
+refGenomes = { 'S288C' : '/home/glbrc.org/mplace/data/reference/S288C_reference_genome_R64-1-1_20110203/s.cerevisiae-R64-1-1' ,
+              'YPS1009' : '/home/glbrc.org/mplace/data/reference/YPS1009/YPS1009' }
 
 def runFastqc():
     """runFastqc
@@ -184,8 +184,8 @@ def alignNonCoding():
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runncBowtie2.sh\n")
         submit.write( "Arguments                = $(ncFastq) $(sam) $(unaligned)\n")
-        submit.write( "Error                    = log/ncbowtie2.submit.err\n")
-        submit.write( "Log                      = log/ncbowtie2.submit.log\n")  
+        submit.write( "Error                    = log/ncbowtie2.$(job).err\n")
+        submit.write( "Log                      = log/ncbowtie2.$(job).log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
         submit.write( "Queue\n" )
     submit.close()
@@ -209,37 +209,20 @@ def alignBowtie():
     align reads to S288C using bowtie2 
     write the bowtie2 condor submit file
     """    
-    # Create input file for alignment to the S288C reference genome.
-    outputPath = parentDir + 'alignments/S288C/'
-    with open('refAlignmentS288C_input.txt', 'w') as out:
-        for inFastq in glob.glob(parentDir + 'alignments/*.fastq'):
-            sampleName = re.sub('.fastq', '.sam', os.path.basename(inFastq))
-            out.write(inFastq + ' ' + outputPath + sampleName + ' /home/glbrc.org/mplace/data/reference/S288C_reference_genome_R64-1-1_20110203/s.cerevisiae-R64-1-1' + '\n')
-    out.close
+    # generic submit file, just need to provide reference
+    with open('alignment.jtf', 'w') as submit:
+        submit.write( "Universe                 = vanilla\n" )
+        submit.write( "Executable               = runAlignment.sh\n")
+        submit.write( "Arguments                = $(fastqFile) $(sam) $(ref)\n")
+        submit.write( "Error                    = log/alignment.$(job).err\n")
+        submit.write( "Log                      = log/alignment.$(job).log\n")  
+        submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
+        submit.write( "Queue\n" )
+    submit.close()
 
-    #S288C
-    with open('s288cbowtie2.submit', 'w') as submit:
-        submit.write( "Universe                 = vanilla\n" )
-        submit.write( "Executable               = runBowtie2.sh\n")
-        submit.write( "Arguments                = $(fastqFile) $(sam) $(ref)\n")
-        submit.write( "Error                    = s288c_bowtie2.submit.err\n")
-        submit.write( "Log                      = s288c_bowtie2.submit.log\n")  
-        submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue fastqFile, sam, ref from refAlignmentS288C_input.txt\n" )
-    submit.close()
-    #YPS1009
-    with open('yps1009bowtie2.submit', 'w') as submit:
-        submit.write( "Universe                 = vanilla\n" )
-        submit.write( "Executable               = runBowtie2.sh\n")
-        submit.write( "Arguments                = $(fastqFile) $(sam) $(ref)\n")
-        submit.write( "Error                    = yps1009_bowtie2.submit.err\n")
-        submit.write( "Log                      = yps1009_bowtie2.submit.log\n")  
-        submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue fastqFile, sam, ref from refAlignmentYPS1009_input.txt\n" )
-    submit.close()
 
     # write shell script to run bowtie2
-    with open('runBowtie2.sh', 'w') as out:
+    with open('runAlignment.sh', 'w') as out:
         out.write("#!/bin/bash\n")
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
@@ -248,7 +231,7 @@ def alignBowtie():
         out.write("conda deactivate")
     out.close()
 
-    os.chmod('runBowtie2.sh', 0o0777)
+    os.chmod('runAlignment.sh', 0o0777)
     
 def sortAlignment():
     """sortAlignment
@@ -272,7 +255,6 @@ def sortAlignment():
         submit.write( "Error                    = sort.submit.err\n")
         submit.write( "Log                      = sort.submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        #submit.write( "Queue sam, bam from  sort-S288C_input.txt\n" )
         submit.write( "Queue sam, bam from sort-YPS1009_input.txt\n" )
     submit.close()
 
@@ -365,8 +347,6 @@ def main():
     # create output dirs for genome alignments
     if not os.path.exists(parentDir + 'alignments'):
         os.mkdir(parentDir + 'alignments')
-        os.mkdir(parentDir + 'alignments/S288C')
-        os.mkdir(parentDir + 'alignments/YPS1009') 
 
     # create Dagfile object, utilize HTCondor Dagman to manage pipeline.
     mydag = Dagfile()
@@ -400,22 +380,32 @@ def main():
         mydag.add_job(rmJob)
         num += 1 
         
-        # 4th step run align reads to Non-coding RNA
+        # 4th step run align reads to Non-coding RNA, outputs reads aligned to 
+        # Non-coding RNA and a fastq file for reads that did not align.
         ncInputFastq = cutadaptOutDir + re.sub('.fastq', '-filt.fastq', fsa)
         ncSamOut     = nonCodingOutDir + re.sub('.fastq', '.sam', fsa)
-        unalignedSam = nonCodingOutDir + re.sub('.fastq', '-unaligned.fastq', fsa )
+        unalignedFastq = nonCodingOutDir + re.sub('.fastq', '-unaligned.fastq', fsa )
         alignNCJob = Job('ncbowtie2.jtf', 'job' + str(num))
         alignNCJob.pre_skip(1)
         alignNCJob.add_var('ncFastq', ncInputFastq)
         alignNCJob.add_var('sam', ncSamOut)
-        alignNCJob.add_var('unaligned', unalignedSam)
+        alignNCJob.add_var('unaligned', unalignedFastq)
+        alignNCJob.add_var('job', str(num))
         alignNCJob.add_parent(rmJob)
         mydag.add_job(alignNCJob)
         num += 1 
         
-        
-        
-        
+        # 5th step align unaligned reads from previous step to reference genome.
+        alignedSam = parentDir + 'alignments/' + re.sub('.fastq', '.sam', fsa)
+        alignJob   = Job('alignment.jtf', 'job' + str(num))
+        alignJob.pre_skip(1)
+        alignJob.add_var('fastqFile',unalignedFastq )
+        alignJob.add_var('sam', alignedSam) 
+        alignJob.add_var('ref', refGenomes['YPS1009'])
+        alignJob.add_var('job', str(num))
+        alignJob.add_parent(alignNCJob)
+        mydag.add_job(alignJob)
+        num+=1            
             
     mydag.save('MasterDagman.dsf')      # write the dag submit file
     
@@ -424,9 +414,7 @@ def main():
     runCutAdapt()
     runRemoveFirst()
     alignNonCoding()
-        
-    
-
+    alignBowtie()          
 
 if __name__ == "__main__":
     main()
