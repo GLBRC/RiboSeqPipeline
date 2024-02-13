@@ -32,9 +32,10 @@ reads that align will be discarded.
 
 Allow 1 mismatch in bowtie alignment.
 
-Alignment files (SAM/BAM) provide forward/reverse alignment information is provided by the Sam Flag.    0 is read aligned in the Fwd direction
-    4 is unaligned
-    16 is aligned in the Rvs direction
+Alignment files (SAM/BAM) provide forward/reverse alignment information is provided by the Sam Flag.   
+    0 is read aligned in the Fwd direction
+    4 is read unaligned
+    16 is read aligned in the Rvs direction
 
 Align the remaining reads with Bowtie to YPS1009 and S288C reference genomes.Run samtools mpileup to generate base counts for all genes in YPS1009 and S288C.
 
@@ -149,6 +150,7 @@ def runRemoveFirst():
     with open('rmFirst.jtf', 'w') as submit:
                 submit.write( "Universe                 = vanilla\n" )
                 submit.write( "Executable               = runRmFirst.sh\n")
+                submit.write( "Arguments                = $(cleanFastq)\n")
                 submit.write( "Error                    = log/rmFirst.$(job).err\n")
                 submit.write( "Log                      = log/rmFirst.$(job).log\n")  
                 submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
@@ -161,7 +163,7 @@ def runRemoveFirst():
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
         out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("/home/glbrc.org/mplace/scripts/riboSeqPipeline/removeFirstBase.py\n")
+        out.write("/home/glbrc.org/mplace/scripts/riboSeqPipeline/removeFirstBase.py -f $1\n")
         out.write("conda deactivate")
     out.close()
 
@@ -206,19 +208,20 @@ def alignNonCoding():
 
 def removeNonCoding():
     """removeNonCoding
-    -F --exclude-flags FLAG ,     Do not output alignments with any bits set in FLAG present in the FLAG field.
-    in this case we exclude the reads which did not align to the Non-coding RNA i.e. the reads we want to analyze later.
+    -f, (--require-flags FLAG   ...have all of the FLAGs present)
+    Do not output alignments with any bits set in FLAG present in the FLAG field, 
+    only select unaligned reads, sam flag "4", i.e. the reads we want to analyze later.
     """   
-    # write the samtools filter UNMAPPED (reads which did not align to Non-Coding RNA) reads condor submit file
-    # these reads will be aligned to S288C and YPS1009
+    # write the samtools filter UNMAPPED submit file 
+    # these reads will be aligned to reference genome.
     with open('filterNC.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runfilterNC.sh\n")
-        submit.write( "Arguments                = $(ncsam) $(outsam)\n")
+        submit.write( "Arguments                = $(ncSam) $(unaligned)\n")
         submit.write( "Error                    = log/filter.submit.err\n")
         submit.write( "Log                      = log/filter.submit.log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue sam, ncsam from filterSamInput.txt\n" )
+        submit.write( "Queue\n" )
     submit.close()
 
     # write shell script to run 
@@ -227,38 +230,11 @@ def removeNonCoding():
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
         out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("samtools view -f 4 -u -O SAM -o $2 $1\n")
+        out.write("/mnt/bigdata/linuxhome/mplace/scripts/riboSeqPipeline/removeNonCoding.py -s $1 -o $2\n")
         out.write("conda deactivate")
     out.close()
 
-    os.chmod('runfilterNC.sh', 0o0777)
-
-    # Create new fastq files by filtering for reads that DID NOT ALIGN to the Non-Coding RNA
-    # First create a new file containing the read names (for reads we want to keep)
-    # nonCodingOutDir
-    for unmapped in glob.glob(nonCodingOutDir + '*-unmapped.sam'):
-        nameFile = re.sub('-unmapped.sam', '', os.path.basename(unmapped))
-        outFile  = parentDir + 'alignments/' + nameFile + '-names.txt'
-        with open(unmapped) as f, open(outFile, 'w') as out:
-            for line in f:
-                name = line.split('\t')[0]
-                out.write(f'{name}\n')
-        f.close()
-        out.close()
-            
-        
-    # Use seqtk to subset the unmapped reads for use with bowtie2
-    for fstq in glob.glob(cutadaptOutDir + '*-filt.fastq'):
-        print('processing: ', fstq)
-        outFile = parentDir + 'alignments/' +  re.sub('-filt.fastq', '.fastq', os.path.basename(fstq))    # create output file name
-        nameLst = parentDir + 'alignments/' + re.sub('-filt.fastq', '-names.txt', os.path.basename(fstq)) 
-        cmd = [ 'seqtk', 'subseq', fstq, nameLst ]
-        # run command and capture output
-        output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()    
-        # write results to file
-        with open(outFile, 'w') as out:
-            out.write(output[0].decode('utf-8'))
-        out.close()     
+    os.chmod('runfilterNC.sh', 0o0777)    
 
 def alignBowtie():
     """alignBowtie
@@ -453,6 +429,7 @@ def main():
         # 3rd step run removeFirstBase
         rmJob = Job('rmFirst.jtf', 'job' + str(num))
         rmJob.pre_skip(1)
+        rmJob.add_var('cleanFastq', cutadaptOutName)
         rmJob.add_parent(cutadaptJob)
         mydag.add_job(rmJob)
         num += 1 
@@ -469,10 +446,11 @@ def main():
         num += 1 
         
         # 5th step filter the Non-Coding alignments
+        unaligned = re.sub('.sam', '-unaligned.fastq', ncSamOut)
         ncFilterJob = Job('filterNC.jtf', 'job' + str(num))
         ncFilterJob.pre_skip(1)
         ncFilterJob.add_var('ncSam', ncSamOut)
-        ncFilterJob.add_var()
+        ncFilterJob.add_var('unaligned', unaligned)
         ncFilterJob.add_parent(alignNCJob)
         mydag.add_job(ncFilterJob)
         num += 1    
