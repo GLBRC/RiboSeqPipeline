@@ -27,36 +27,38 @@ import argparse
 import glob
 import os
 import re
+import subprocess
 import sys
 
-# Create new fastq files by filtering for reads that DID NOT ALIGN to the Non-Coding RNA
-# First create a new file containing the read names (for reads we want to keep)
-# nonCodingOutDir
-'''
-for unmapped in glob.glob(nonCodingOutDir + '*-unmapped.sam'):
-    nameFile = re.sub('-unmapped.sam', '', os.path.basename(unmapped))
-    outFile  = parentDir + 'alignments/' + nameFile + '-names.txt'
-    with open(unmapped) as f, open(outFile, 'w') as out:
-        for line in f:
-            name = line.split('\t')[0]
-            out.write(f'{name}\n')
-    f.close()
-    out.close()
-        
+nonCodingOutDir = os.getcwd() + '/alignNonCodingRNA/'
+
+def filter(inSam, outFile):
+    """filter
     
-# Use seqtk to subset the unmapped reads for use with bowtie2
-for fstq in glob.glob(cutadaptOutDir + '*-filt.fastq'):
-    print('processing: ', fstq)
-    outFile = parentDir + 'alignments/' +  re.sub('-filt.fastq', '.fastq', os.path.basename(fstq))    # create output file name
-    nameLst = parentDir + 'alignments/' + re.sub('-filt.fastq', '-names.txt', os.path.basename(fstq)) 
-    cmd = [ 'seqtk', 'subseq', fstq, nameLst ]
-    # run command and capture output
-    output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()    
-    # write results to file
-    with open(outFile, 'w') as out:
-        out.write(output[0].decode('utf-8'))
-    out.close() 
-'''
+    Create new fastq files by filtering for reads that DID NOT ALIGN to the Non-Coding RNA.  
+        
+    samtools view -f 4 -u -O SAM -o $2 $1
+    """
+    # Get a list of reads which aligned to Non-Coding RNA and remove them from the *-filt.fastq files
+    sampleName = re.sub('.sam', '', os.path.basename(inSam))
+    outSam = nonCodingOutDir + sampleName + '-unmapped.sam'
+    #cmd = [ 'samtools', 'view', '-f', '4', '-u', '-O', 'SAM', outFile, inSam ]
+    #subprocess.Popen( cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()                     
+       
+    '''
+    # Use seqtk to subset the unmapped reads for use with bowtie2
+    for fstq in glob.glob(cutadaptOutDir + '*-filt.fastq'):
+        print('processing: ', fstq)
+        outFile = parentDir + 'alignments/' +  re.sub('-filt.fastq', '.fastq', os.path.basename(fstq))    # create output file name
+        nameLst = parentDir + 'alignments/' + re.sub('-filt.fastq', '-names.txt', os.path.basename(fstq)) 
+        cmd = [ 'seqtk', 'subseq', fstq, nameLst ]
+        # run command and capture output
+        output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()    
+        # write results to file
+        with open(outFile, 'w') as out:
+            out.write(output[0].decode('utf-8'))
+        out.close() 
+    '''
 
 def main():
     cmdparser = argparse.ArgumentParser(description="Create new fastq files using reads NOT aligned to reference NON-CODING rna.",
@@ -88,9 +90,7 @@ def main():
         cmdparser.print_help()
         sys.exit(1)
         
-    print("\n\n")
-    print(inSam)
-    print(outFile)
+    filter(inSam, outFile)
         
         
 if __name__ == "__main__":
