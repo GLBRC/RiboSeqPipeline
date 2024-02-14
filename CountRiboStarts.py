@@ -75,6 +75,20 @@ def countStarts(sortedSam, reference = 'YPS1009'):
     chromSizes = pickle.load(sizeDB)
     sizeDB.close()   
     
+    # load the YPS1009 modified bed file
+    BED = {}
+    with open(genome_info[reference],'r') as f:
+        f.readline()
+        for ln in f:
+            dat = ln.rstrip().split()
+            if dat[0] not in BED:
+                BED[dat[0]] = {}
+                if dat[3] not in BED[dat[0]]:
+                    BED[dat[0]][dat[3]] = {'start': int(dat[1]), 'end': int(dat[2]), 'strand':dat[4]}
+            else:
+                if dat[3] not in BED[dat[0]]:
+                    BED[dat[0]][dat[3]] = {'start': int(dat[1]), 'end': int(dat[2]), 'strand':dat[4]}
+    
     # set first reference genome chromosome
     if reference == 'YPS1009':
         prevChrom = 'chrI'
@@ -102,13 +116,9 @@ def countStarts(sortedSam, reference = 'YPS1009'):
         
         chromBeds[prevChrom] = IntervalTree(features,1, int(chromSizes[prevChrom])) # write most recent
         
-    print(chromBeds)
-'''
-    
-    #aln = 'alignments/S288C/ANEU-LOG-30-sorted.sam'
-    outName = re.sub('-sorted.sam', '-RiboSeq-all-counts-S288C_v1.txt', aln)
+    outName = re.sub('-sorted.sam', f'-RiboSeq-all-counts-{reference}_v1.txt', sortedSam)
 
-    print('processing ', aln, outName)
+    print('processing ', sortedSam, outName)
     
     # set up results dictionary for the counting of start positions
     results = {}
@@ -120,7 +130,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
     # we are interested in columns  2, 3, 4 (FLAG, RNAME, POS)
     # we use the NM tag to decide if there is an exact match
     # NM Edit distance to the reference, NM:i:0 (exact match), NM:i:1 is one mismatch.
-    with open(aln, 'r') as f, open('gene_name.txt', 'w') as geneOut:
+    with open(sortedSam, 'r') as f, open('gene_name.txt', 'w') as geneOut:
         for line in f:
             # skip header information
             if not line.startswith('@'):
@@ -145,21 +155,15 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                                 gene = chromBeds[chrom].find_range([readStart, readStart])   # which gene does this read start in
                                 if gene is not None:                                       
                                     for g in gene:                                         # this is a list, make sure we have the proper strand 
-                                        if S288CBED[chrom][g]['strand'] == '-':
-                                            #testout = f'{chrom}  {readStart}  {myTag}   {str(cigar)}  {str(seqLen)}  {gene} \n'
-                                            #geneOut.write(testout)
-                                            #out.write(f'{chrom},  {readStart}, {tag}, {myTag}, {g}\n')
-                                            #print( 'start ' , S288CBED[chrom][g]['start'], 'end', S288CBED[chrom][g]['end'],
-                                            #                    'strand', S288CBED[chrom][g]['strand'], 'pos', readStart, 'cnts', 1 )
+                                        if BED[chrom][g]['strand'] == '-':
                                             if g not in results[chrom]:
-                                                results[chrom][g] = {'start' : S288CBED[chrom][g]['start'], 'end': S288CBED[chrom][g]['end'],
-                                                                'strand': S288CBED[chrom][g]['strand'], 'pos' : {readStart : 1 }}
+                                                results[chrom][g] = {'start' : BED[chrom][g]['start'], 'end': BED[chrom][g]['end'],
+                                                                'strand': BED[chrom][g]['strand'], 'pos' : {readStart : 1 }}
                                             else:
                                                 if readStart in results[chrom][g]['pos']:
                                                     results[chrom][g]['pos'][readStart] += 1 
                                                 else:
                                                     results[chrom][g]['pos'][readStart] = 1 
-
                 elif read[1] == '0':           # mapped in forward direction
                     chrom    = read[2]
                     readStart = int(read[3])
@@ -171,26 +175,20 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                                 gene = chromBeds[chrom].find_range([readStart, readStart])   # which gene does this read start in
                                 if gene is not None:                                       
                                     for g in gene:                                         # this is a list, make sure we have the proper strand 
-                                        if S288CBED[chrom][g]['strand'] == '+':
-                                            #out.write(f'{chrom},  {readStart}, {tag}, {myTag}, {g}\n')
-                                            #print( 'start ' , S288CBED[chrom][g]['start'], 'end', S288CBED[chrom][g]['end'],
-                                            #                    'strand', S288CBED[chrom][g]['strand'], 'pos', readStart, 'cnts', 1 )
+                                        if BED[chrom][g]['strand'] == '+':
                                             if g not in results[chrom]:
-                                                results[chrom][g] = {'start' : S288CBED[chrom][g]['start'], 'end': S288CBED[chrom][g]['end'],
-                                                                'strand': S288CBED[chrom][g]['strand'], 'pos' : {readStart : 1 }}
+                                                results[chrom][g] = {'start' : BED[chrom][g]['start'], 'end': BED[chrom][g]['end'],
+                                                                'strand': BED[chrom][g]['strand'], 'pos' : {readStart : 1 }}
                                             else:
                                                 if readStart in results[chrom][g]['pos']:
                                                     results[chrom][g]['pos'][readStart] += 1 
                                                 else:
                                                     results[chrom][g]['pos'][readStart] = 1   
-                
     f.close()    
-'''
-'''  
+
     #results['ref|NC_001134|']['YBL039C']
     ### Write table of start position counts
     with open(outName, 'w') as out:
-        #with open('MINUS-STRAND-TEST.txt', 'w') as out:
         for c in results.keys():
             for gene in results[c].keys():
                 sortedPos = list(results[c][gene]['pos'].keys())
@@ -198,7 +196,6 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                 endPos   = results[c][gene]['end']
                 strand   = results[c][gene]['strand']
                 sortedPos.sort()
-                #print(c, gene, results[c][gene]['start'], results[c][gene]['end'], results[c][gene]['strand'])
                 outCodon = []         
                 outPos = []           # genome position
                 outCnt = []
@@ -211,17 +208,6 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                             outCnt.append(str(results[c][gene]['pos'][p]))
                         else:
                             outCnt.append('0')
-
-                    #for i, tmp in enumerate(outPos, start=-72):
-                    #    outCodon.append(str(i))
-                    
-                    #out.write(f'{c}\n')
-                    #outPos.reverse()
-                    #posLine   = f'Genome_Position ' + ' '.join(outPos) + '\n'
-                    #out.write(posLine)
-                    
-                    #codonLine = f'{results[c][gene]["strand"]} ' + ' '.join(outCodon) + '\n'
-                    #out.write(codonLine)
                     
                     outCnt.reverse()
                     countLine = f'{gene} ' + ' '.join(outCnt)   + '\n'
@@ -237,14 +223,9 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                         else:
                             outCnt.append('0')
                         
-                    #out.write(f'{c}\n')
-                    #posLine   = f'Genome_Position ' + ' '.join(outPos) + '\n'
-                    #out.write(posLine)
-                    #codonLine = f'{results[c][gene]["strand"]} ' + ' '.join(outCodon) + '\n'
-                    #out.write(codonLine)
                     countLine = f'{gene} ' + ' '.join(outCnt)   + '\n'
                     out.write(countLine)
-'''
+
 def main():
     
     cmdparser = argparse.ArgumentParser(description="Count Ribo-Seq start sites using reference genome aligned sam file.",
