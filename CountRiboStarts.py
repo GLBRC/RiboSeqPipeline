@@ -1,7 +1,90 @@
 #!/usr/bin/env python
-"""RiboSeqPipeline.py
-"""
+"""CountRiboStarts.py
 
+Given a sam file produce a table of read start counts.
+Part of the Ribo-Seq pipeline.
+
+Notes
+-----
+Currently only set up to use YPS1009.
+   
+Parameters
+----------
+s : str
+    Sam alignment file, assumed to be aligned to YPS1009(default) or S288C
+
+Example
+-------
+    usage:
+
+        CountRiboStarts.py -s sample_X.sam
+    
+
+"""
+import argparse 
+import os
+import pickle 
+import re
+import subprocess
+import sys
+from interval_tree import IntervalTree  # for efficient searching of gene locations
+
+# Pickled reference genome chromosome sizes
+chromosome_info = { 'YPS1009':'/mnt/bigdata/linuxhome/mplace/data/reference/YPS1009/YPS1009_chromSizes.pkl',
+              'S288C' : '/mnt/bigdata/linuxhome/mplace/data/reference/S288C_reference_genome_R64-1-1_20110203/individualChroms/S288C_chromSizes.pkl'
+              }
+# Pickled reference genome bed files, contains -72 bases upstream of start and +60 bases from stop. 
+genome_info = { 'YPS1009' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/YPS1009_GeneBed.pkl',
+                'S288C' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/S288C_GeneBed.pkl'  
+              }
+
+def chrSize():
+    """chrSize
+
+    Create a dictionary of chromosome sizes, required for the interval tree.
+    """
+    #chromosome sizes, Need these values for the interval tree
+    chromSize = {}
+    with open(chromosome_info['YPS1009'], 'r') as f:
+        for ln in f:
+            chrom, length = ln.rstrip().split()
+            if chrom not in chromSize:
+                chromSize[chrom] = int(length)
+
+    return chromSize
+
+def sortSam(samFile, outSam ):
+    """sortSam
+    
+    Sort input alignment file.    
+    """
+    # set up samtools sort call, output to bam
+    cmd = ['samtools', 'sort', '-O', 'SAM', '-o', outSam, samFile]
+    output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+        
+    result = output[0].decode('utf-8')
+    log    = output[1].decode('utf-8')
+
+    # add logging here 
+    print(result)
+    #print('\n\n')
+    print(log)
+
+    
+def countStarts(reference = 'YPS1009'):
+    """countStarts
+    
+    Use interval tree to count alignment start sites.    
+    """
+    gffDB = open(genome_info[reference], 'rb')    
+    geneBed = pickle.load(gffDB)
+    for keys in geneBed:
+        print(keys, '=>', geneBed[keys])
+    gffDB.close()
+    
+    
+    
+'''
 for aln in glob.glob('alignments/S288C/*-sorted.sam'):    
     #aln = 'alignments/S288C/ANEU-LOG-30-sorted.sam'
     outName = re.sub('-sorted.sam', '-RiboSeq-all-counts-S288C_v1.txt', aln)
@@ -83,9 +166,10 @@ for aln in glob.glob('alignments/S288C/*-sorted.sam'):
                                                     results[chrom][g]['pos'][readStart] = 1   
                 
     f.close()    
-      
-#results['ref|NC_001134|']['YBL039C']
-### Write table of start position counts
+'''
+'''  
+    #results['ref|NC_001134|']['YBL039C']
+    ### Write table of start position counts
     with open(outName, 'w') as out:
         #with open('MINUS-STRAND-TEST.txt', 'w') as out:
         for c in results.keys():
@@ -141,12 +225,13 @@ for aln in glob.glob('alignments/S288C/*-sorted.sam'):
                     #out.write(codonLine)
                     countLine = f'{gene} ' + ' '.join(outCnt)   + '\n'
                     out.write(countLine)
-
+'''
 def main():
     
-    cmdparser = argparse.ArgumentParser(description="Ribo-Seq pipeline, produces alignments and counts.",
-                                        usage='%(prog)s -f <fastqFileList.txt>' ,prog='RiboSeqPipeline.py'  )
-    cmdparser.add_argument('-f', '--file',    action='store', dest='FILE',    help='Text file, one fastq file name per line, read 1 only if paired-end.', metavar='')
+    cmdparser = argparse.ArgumentParser(description="Count Ribo-Seq start sites using reference genome aligned sam file.",
+                                        usage='%(prog)s -s <alignment.sam>' ,prog='CountRiboStars.py'  )
+    cmdparser.add_argument('-s', '--sam', action='store', dest='SAM', help='Sample reads aligned to reference genome, SAM format.', metavar='')
+    cmdparser.add_argument('-o', '--out', action='store', dest='OUT', help='Sorted sam file output name.', metavar='')
     cmdResults = vars(cmdparser.parse_args())
         
     # if no args print help
@@ -154,13 +239,25 @@ def main():
         print("")
         cmdparser.print_help()
         sys.exit(1)
+    # process command line arguments
+    if cmdResults['SAM'] is not None:
+        samFile = cmdResults['SAM']
+    else:
+        print()
+        cmdparser.print_help()
+        sys.exit(1)
+        
+    if cmdResults['OUT'] is not None:
+        outSam = cmdResults['OUT']
+    else:
+        print()
+        cmdparser.print_help()
+        sys.exit(1)
+        
+    sortSam(samFile, outSam)
+    countStarts()
     
-    if cmdResults['FILE'] is not None:
-        fastqFile = cmdResults['FILE']
-        fastqLst = []
-        with open(fastqFile, 'r') as f:
-            for ln in f:
-                fastqLst.append(ln.rstrip())
+    
 
 if __name__ == "__main__":
     main()
