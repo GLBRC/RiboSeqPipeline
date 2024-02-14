@@ -30,12 +30,12 @@ import sys
 from interval_tree import IntervalTree  # for efficient searching of gene locations
 
 # Pickled reference genome chromosome sizes
-chromosome_info = { 'YPS1009':'/mnt/bigdata/linuxhome/mplace/data/reference/YPS1009/YPS1009_chromSizes.pkl',
-              'S288C' : '/mnt/bigdata/linuxhome/mplace/data/reference/S288C_reference_genome_R64-1-1_20110203/individualChroms/S288C_chromSizes.pkl'
+chromosome_info = { 'YPS1009':'/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/YPS1009_chromSizes.pkl',
+              'S288C' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/S288C_chromSizes.pkl'
               }
-# Pickled reference genome bed files, contains -72 bases upstream of start and +60 bases from stop. 
-genome_info = { 'YPS1009' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/YPS1009_GeneBed.pkl',
-                'S288C' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/S288C_GeneBed.pkl'  
+# reference genome bed files, contains -72 bases upstream of start and +60 bases from stop. 
+genome_info = { 'YPS1009' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/YPS1009-Genes.bed',
+                'S288C' : '/home/glbrc.org/mplace/scripts/riboSeqPipeline/reference/S288C-Genes.bed'  
               }
 
 def chrSize():
@@ -62,30 +62,49 @@ def sortSam(samFile, outSam ):
     cmd = ['samtools', 'sort', '-O', 'SAM', '-o', outSam, samFile]
     output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
         
-    result = output[0].decode('utf-8')
-    log    = output[1].decode('utf-8')
-
-    # add logging here 
-    print(result)
-    #print('\n\n')
-    print(log)
-
+    #result = output[0].decode('utf-8')
+    #log    = output[1].decode('utf-8') 
     
-def countStarts(reference = 'YPS1009'):
+def countStarts(sortedSam, reference = 'YPS1009'):
     """countStarts
     
     Use interval tree to count alignment start sites.    
     """
-    gffDB = open(genome_info[reference], 'rb')    
-    geneBed = pickle.load(gffDB)
-    for keys in geneBed:
-        print(keys, '=>', geneBed[keys])
-    gffDB.close()
+    # load the reference genome chromosize file
+    sizeDB = open(chromosome_info[reference], 'rb')
+    chromSizes = pickle.load(sizeDB)
+    sizeDB.close()   
     
+    # set first reference genome chromosome
+    if reference == 'YPS1009':
+        prevChrom = 'chrI'
+    else:
+        prevChrom = 'ref|NC_001133|'  # for S288C R64-1-1
     
-    
+    # construct interval tree 
+    chromBeds = {}
+    with open(genome_info[reference], 'r') as f:
+        f.readline()                        # skip header
+        features = []
+        for ln in f:                         
+            dat = ln.split()                #  ['ref|NC_001133|', '263', '709', 'YAL069W', '+']
+            if dat[0] == prevChrom:
+                row = [int(dat[1]), int(dat[2]), dat[3]]
+                features.append(row)
+            elif dat[0] != prevChrom:
+                chromBeds[prevChrom] = IntervalTree(features,1, int(chromSizes[prevChrom])) # write most recent
+                if dat[0] not in chromBeds:
+                    chromBeds[dat[0]] = None
+                features = []
+                row = [int(dat[1]), int(dat[2]), dat[3]]
+                features.append(row)
+                prevChrom = dat[0]
+        
+        chromBeds[prevChrom] = IntervalTree(features,1, int(chromSizes[prevChrom])) # write most recent
+        
+    print(chromBeds)
 '''
-for aln in glob.glob('alignments/S288C/*-sorted.sam'):    
+    
     #aln = 'alignments/S288C/ANEU-LOG-30-sorted.sam'
     outName = re.sub('-sorted.sam', '-RiboSeq-all-counts-S288C_v1.txt', aln)
 
@@ -255,7 +274,7 @@ def main():
         sys.exit(1)
         
     sortSam(samFile, outSam)
-    countStarts()
+    countStarts(outSam)
     
     
 
