@@ -1,8 +1,44 @@
 # RiboSeqPipeline
 
-Jupyter notebook ribosome sequencing data processing pipeline.
+Generate tables of read start counts for Ribo-Seq data.
 
 ## Getting started
+
+Pipeline is designed to be run using GLBRC's scarcity-submit node.
+After logging into scarcity-submit activate the riboSeq conda environment.
+
+conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq
+
+Please run this pipeline in a dedicated directory and create a subdirectory
+called fastq. Put all of your Read 1 (fwd) fastq files in this directory.
+If fastq files are .gz, decompress them. Create a text file containing the
+fastq names.  This file will be used to run the pipeline.
+
+ls fastq > fastqFiles.txt
+
+MyProject 
+    - fastq
+
+## Running the Pipeline
+
+/home/glbrc.org/mplace/scripts/riboSeqPipeline/RiboSeqPipeline.py -f fastqFiles.txt
+
+## Results
+The following directories will be created:
+ 
+ alignments  -- alignment to reference genome results (.sam files)
+ alignNonCodingRNA -- filtering step, alignment of intial fastq to Non-Coding RNA.
+ condor    -- condor files
+ cutadapt  -- fastq files filtered with cutadapt and have additionally had the 1st base
+              removed if quality score <= 10.
+ log       -- log files for each step
+ results   -- contain the count tables for each sample.
+ 
+*******************************************************************************
+
+
+
+## Preliminary pipeline using Jupyter Notebook (do not use.)
 
 Designed used with MicroSoft VS Code and to be used with on GLBRC scarcity with HTCondor.  
 
