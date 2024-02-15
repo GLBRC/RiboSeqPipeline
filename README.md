@@ -16,9 +16,7 @@ fastq names.  This file will be used to run the pipeline.
 
 ls fastq > fastqFiles.txt
 
-MyProject 
-
-    - fastq
+MyProject/ -> fastq/*R1.fastq
 
 ## Running the Pipeline
 
@@ -37,7 +35,7 @@ The following directories will be created:
               removed if quality score <= 10.
 
  log       -- log files for each step
- 
+
  results   -- contain the count tables for each sample.
  
 *******************************************************************************
