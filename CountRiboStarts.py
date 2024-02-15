@@ -126,10 +126,11 @@ def countStarts(sortedSam, reference = 'YPS1009'):
         if chromName not in results:
             results[chromName] = {}   
     
-    # open sam file , MAKE SURE THE SAM FILE IS SORTED (samtools sort)
+    # open sorted sam file 
     # we are interested in columns  2, 3, 4 (FLAG, RNAME, POS)
     # we use the NM tag to decide if there is an exact match
     # NM Edit distance to the reference, NM:i:0 (exact match), NM:i:1 is one mismatch.
+    # Default is to allow 1 mismatch.
     with open(sortedSam, 'r') as f, open('gene_name.txt', 'w') as geneOut:
         for line in f:
             # skip header information
@@ -137,7 +138,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                 read = line.split('\t')
                 if read[1] == '4':             # these reads are unmapped
                     continue
-                elif read[1] == '16':           # mapped in reverse direction
+                elif read[1] == '16':          # mapped in reverse direction
                     chrom    = read[2]
                     readStart = int(read[3])
                     tags     = read[11:]       # section contains tags i.e. NM:i:0
@@ -145,7 +146,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                         if tag.startswith('NM:'):
                             myTag = tag.split('NM:i:')[1]   
                             if myTag == '0' or myTag == '1':
-                                cigar   = re.split('[A-Z]', read[5])   # split cigar string, removing Characters keeping numbers
+                                cigar   = re.split('[A-Z]', read[5])  # split cigar string, removing Characters keeping numbers
                                 cigar =  [i for i in cigar if i]      # remove any blank slots in list
                                 seqLen = 0
                                 for ix in cigar:                      # sum cigar lengths 
@@ -154,7 +155,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                                 readStart -= 1            # subtract one from minus strand to get the read in the right frame 
                                 gene = chromBeds[chrom].find_range([readStart, readStart])   # which gene does this read start in
                                 if gene is not None:                                       
-                                    for g in gene:                                         # this is a list, make sure we have the proper strand 
+                                    for g in gene:                                           # this is a list, make sure we have the proper strand 
                                         if BED[chrom][g]['strand'] == '-':
                                             if g not in results[chrom]:
                                                 results[chrom][g] = {'start' : BED[chrom][g]['start'], 'end': BED[chrom][g]['end'],
@@ -186,10 +187,9 @@ def countStarts(sortedSam, reference = 'YPS1009'):
                                                     results[chrom][g]['pos'][readStart] = 1   
     f.close()    
 
-    #results['ref|NC_001134|']['YBL039C']
     ### Write table of start position counts
     with open(outName, 'w') as out:
-        for c in results.keys():
+        for c in results.keys():      # c = chromosome
             for gene in results[c].keys():
                 sortedPos = list(results[c][gene]['pos'].keys())
                 startPos = results[c][gene]['start']
