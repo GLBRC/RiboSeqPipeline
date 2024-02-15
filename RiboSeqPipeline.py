@@ -2,12 +2,12 @@
 """RiboSeqPipeline.py
 
 Pipeline to align and count start sites for Ribo-Seq data. 
-Pipeline utilizes HTCondor Dagman to manage jobs.
+Pipeline utilizes HTCondor DAGman to manage jobs.
 
 Notes
 ----- 
 Put the fastq files in the parent directory within a directory called fastq.
-If data is paired-end only Read 1 is required, do not include these files.
+If data is paired-end only Read 1 is required, do not include Read 2 files.
  
     ex:   MyProject
             fastq
@@ -20,12 +20,11 @@ Alignment files (SAM/BAM) provide forward/reverse alignment information is provi
     4 is read unaligned
     16 is read aligned in the Rvs direction
 
+Must run on scarcity-submit.glbrc.org.
 use the riboSeq environment: /home/glbrc.org/mplace/.conda/envs/riboSeq 
-
 
 Method
 ------
-
 RiboSeq processing pipeline Steps:
 
     1) Fastqc to check the read length distribution. 
@@ -61,7 +60,6 @@ Requirements
 """
 import argparse 
 import os
-import pickle 
 import re
 import subprocess
 import sys
@@ -105,7 +103,7 @@ def runFastqc():
 def runCutAdapt():
     """runCutadapt
     
-    Run cutadapt on fastq files using the parameters provided by Ezra Bio.
+    Run cutadapt on fastq files using the parameters provided by EzraBio.
     -j 8                - number of cores
     -g "^GGG"           - Sequence of an adapter ligated to the 5' end
     -a "A{10}"          - Sequence of an adapter ligated to the 3' end
@@ -209,8 +207,8 @@ def alignNonCoding():
 def alignBowtie():
     """alignBowtie
     
-    Write the bowtie2 shell script & condor submit file.
-    Align reads to reference genome, default is YPS1009.
+    Write the bowtie2 shell script & condor submit file for reference
+    genome alignment.
     """    
     # generic submit file
     with open('alignment.jtf', 'w') as submit:
@@ -275,7 +273,8 @@ def main():
     
     cmdparser = argparse.ArgumentParser(description="Ribo-Seq pipeline, produces alignments and counts.",
                                         usage='%(prog)s -f <fastqFileList.txt>' ,prog='RiboSeqPipeline.py'  )
-    cmdparser.add_argument('-f', '--file',    action='store', dest='FILE',    help='Text file, one fastq file name per line, read 1 only if paired-end.', metavar='')
+    cmdparser.add_argument('-f', '--file',    action='store', dest='FILE',
+                           help='Text file, one fastq file name per line, read 1 only if paired-end.', metavar='')
     cmdResults = vars(cmdparser.parse_args())
         
     # if no args print help
