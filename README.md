@@ -17,6 +17,7 @@ fastq names.  This file will be used to run the pipeline.
 ls fastq > fastqFiles.txt
 
 MyProject 
+
     - fastq
 
 ## Running the Pipeline
@@ -27,11 +28,16 @@ MyProject
 The following directories will be created:
  
  alignments  -- alignment to reference genome results (.sam files)
+
  alignNonCodingRNA -- filtering step, alignment of intial fastq to Non-Coding RNA.
+
  condor    -- condor files
+
  cutadapt  -- fastq files filtered with cutadapt and have additionally had the 1st base
               removed if quality score <= 10.
+
  log       -- log files for each step
+ 
  results   -- contain the count tables for each sample.
  
 *******************************************************************************
