@@ -168,17 +168,21 @@ def runRemoveFirst():
 def alignNonCoding():
     """alignNonCoding
     
-    """
-    # Align reads with Bowtie2 to non-coding RNA, 
-    # Non-coding RNA is from SGD genome version R64-1-1 
-    # reads that align will be discarded.  Allow 1 mismatch in bowtie2 alignment.
-    # bowtie2 -p 8 --phred33 -N 1 -x $REFERENCE -U $file -S $out.sam 
-    # -p number of threads
-    # -N Sets the number of mismatches
-    # -x The basename of the index for the reference genome
-    # -U file to align (unpaired)
-    # -S File to write SAM alignments
+    Write the shell script & condor submit file to align reads with Bowtie2 to 
+    non-coding RNA. Non-coding RNA reference fasta is from SGD genome version
+    R64-1-1, reads which align will be discarded.  Allow 1 mismatch 
+    in bowtie2 alignment. 
+     
+    Command used:
+     
+    bowtie2 -p 8 --phred33 -N 1 -x $REFERENCE -U $file -S $out.sam 
     
+    -p number of threads
+    -N Sets the number of mismatches
+    -x The basename of the index for the reference genome
+    -U file to align (unpaired)
+    -S File to write SAM alignments
+    """
     # write the bowtie2 condor submit file
     with open('ncbowtie2.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
@@ -205,11 +209,10 @@ def alignNonCoding():
 def alignBowtie():
     """alignBowtie
     
-    Align reads to reference genomes S288C and YPS1009
-    align reads to S288C using bowtie2 
-    write the bowtie2 condor submit file
+    Write the bowtie2 shell script & condor submit file.
+    Align reads to reference genome, default is YPS1009.
     """    
-    # generic submit file, just need to provide reference
+    # generic submit file
     with open('alignment.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
         submit.write( "Executable               = runAlignment.sh\n")
@@ -219,7 +222,6 @@ def alignBowtie():
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
         submit.write( "Queue\n" )
     submit.close()
-
 
     # write shell script to run bowtie2
     with open('runAlignment.sh', 'w') as out:
@@ -233,72 +235,33 @@ def alignBowtie():
 
     os.chmod('runAlignment.sh', 0o0777)
     
-def sortAlignment():
-    """sortAlignment
+def countStarts():
+    """countStarts
     
-    # samtools sort ANEU-LOG-30_S2_R1_001.sam > ANEU-LOG-30_S2_R1_001-sorted.sam
-    # Create input file for samtools sort 
+    Write the Count alignment start positions shell script & condor submit file. 
     """
-    inputFilePath = parentDir + 'alignments/YPS1009/'
-    print(inputFilePath)
-    with open('sort-YPS1009_input.txt', 'w') as out:
-        for sam in glob.glob(inputFilePath + '*.sam'):
-            sampleName = re.sub('.sam', '.bam', os.path.basename(sam))
-            out.write(sam + ' ' + inputFilePath + sampleName + ' \n')
-    out.close
-
-    # Sort the alignment output files S288C and YPS1009
-    with open('sort.submit', 'w') as submit:
+    with open('counts.jtf', 'w') as submit:
         submit.write( "Universe                 = vanilla\n" )
-        submit.write( "Executable               = runsort.sh\n")
-        submit.write( "Arguments                = $(sam) $(bam)\n")
-        submit.write( "Error                    = sort.submit.err\n")
-        submit.write( "Log                      = sort.submit.log\n")  
+        submit.write( "Executable               = runCounts.sh\n")
+        submit.write( "Arguments                = $(sam) $(out)\n")
+        submit.write( "Error                    = log/counts.$(job).err\n")
+        submit.write( "Log                      = log/counts.$(job).log\n")  
         submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
-        submit.write( "Queue sam, bam from sort-YPS1009_input.txt\n" )
+        submit.write( "Queue\n" )
     submit.close()
 
-    # write shell script to run sorting
-    with open('runsort.sh', 'w') as out:
+    # write shell script to run CountRiboStarts.py
+    with open('runCounts.sh', 'w') as out:
         out.write("#!/bin/bash\n")
         out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")
         out.write("unset PYTHONPATH\n")  
         out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")
-        out.write("samtools sort $1  > $2\n")
+        out.write(f"/home/glbrc.org/mplace/scripts/riboSeqPipeline/CountRiboStarts.py -s $1 -o $2\n")
         out.write("conda deactivate")
     out.close()
 
-    os.chmod('runsort.sh', 0o0777)
-
-def prepIntervalTree():
-    """prepIntervalTree
+    os.chmod('runCounts.sh', 0o0777)
     
-    """        
-    prevChrom = 'ref|NC_001133|'
-    chromBeds = {}
-    with open('S288C-Genes.bed', 'r') as f:
-        f.readline()                        # skip header
-        features = []
-        for ln in f:
-            dat = ln.split()                #  ref|NC_001133| 263 709 YAL069W +
-
-            if dat[0] == prevChrom:
-                row = [int(dat[1]), int(dat[2]), dat[3]]
-                features.append(row)
-            elif dat[0] != prevChrom:
-                chromBeds[prevChrom] = IntervalTree(features,1, int(S288C_chromSizes[prevChrom])) # write most recent
-                if dat[0] not in chromBeds:
-                    chromBeds[dat[0]] = None
-                features = []
-                row = [int(dat[1]), int(dat[2]), dat[3]]
-                features.append(row)
-                prevChrom = dat[0]
-        
-        chromBeds[prevChrom] = IntervalTree(features,1, int(S288C_chromSizes[prevChrom])) # write most recent
-
-def countStartPos():
-    pass
-
 def cleanUp():
     pass
 
@@ -306,8 +269,6 @@ def writeReadMe():
     pass
 
 def writeCitations():
-    
-    
     pass
 
 def main():
@@ -405,7 +366,18 @@ def main():
         alignJob.add_var('job', str(num))
         alignJob.add_parent(alignNCJob)
         mydag.add_job(alignJob)
-        num+=1            
+        num+=1     
+        
+        # 6th step count alignment start sites
+        sortedSam = re.sub('.sam', '-sorted.sam' , alignedSam)
+        countJob = Job('counts.jtf', 'job' + str(num))       
+        countJob.pre_skip(1)
+        countJob.add_var('job', str(num))
+        countJob.add_var('sam', alignedSam)
+        countJob.add_var('out', sortedSam)
+        countJob.add_parent(alignJob)
+        mydag.add_job(countJob)
+        num += 1
             
     mydag.save('MasterDagman.dsf')      # write the dag submit file
     
@@ -414,7 +386,8 @@ def main():
     runCutAdapt()
     runRemoveFirst()
     alignNonCoding()
-    alignBowtie()          
+    alignBowtie() 
+    countStarts()         
 
 if __name__ == "__main__":
     main()
