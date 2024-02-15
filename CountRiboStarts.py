@@ -13,13 +13,16 @@ Parameters
 s : str
     Sam alignment file, assumed to be aligned to YPS1009(default) or S288C
 
+o : str
+    Name for the sorted sam file which will be created by the script.
+
 Example
 -------
     usage:
 
-        CountRiboStarts.py -s sample_X.sam
-    
-
+        CountRiboStarts.py -s sample_X.sam -o sample_X-sorted.sam  
+        
+    NOTE: you just need to supply the sorted sam name, it will be created by the script.
 """
 import argparse 
 import os
@@ -95,7 +98,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
     else:
         prevChrom = 'ref|NC_001133|'  # for S288C R64-1-1
     
-    # construct interval tree 
+    # construct interval tree for efficient identification of genes
     chromBeds = {}
     with open(genome_info[reference], 'r') as f:
         f.readline()                        # skip header
@@ -117,8 +120,6 @@ def countStarts(sortedSam, reference = 'YPS1009'):
         chromBeds[prevChrom] = IntervalTree(features,1, int(chromSizes[prevChrom])) # write most recent
         
     outName = re.sub('-sorted.sam', f'-RiboSeq-all-counts-{reference}_v1.txt', sortedSam)
-
-    print('processing ', sortedSam, outName)
     
     # set up results dictionary for the counting of start positions
     results = {}
@@ -229,7 +230,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
 def main():
     
     cmdparser = argparse.ArgumentParser(description="Count Ribo-Seq start sites using reference genome aligned sam file.",
-                                        usage='%(prog)s -s <alignment.sam>' ,prog='CountRiboStars.py'  )
+                                        usage='%(prog)s -s <alignment.sam> -o <sorted sam output name>' ,prog='CountRiboStars.py'  )
     cmdparser.add_argument('-s', '--sam', action='store', dest='SAM', help='Sample reads aligned to reference genome, SAM format.', metavar='')
     cmdparser.add_argument('-o', '--out', action='store', dest='OUT', help='Sorted sam file output name.', metavar='')
     cmdResults = vars(cmdparser.parse_args())
