@@ -131,7 +131,7 @@ def countStarts(sortedSam, reference = 'YPS1009'):
     # we use the NM tag to decide if there is an exact match
     # NM Edit distance to the reference, NM:i:0 (exact match), NM:i:1 is one mismatch.
     # Default is to allow 1 mismatch.
-    with open(sortedSam, 'r') as f, open('gene_name.txt', 'w') as geneOut:
+    with open(sortedSam, 'r') as f:
         for line in f:
             # skip header information
             if not line.startswith('@'):
