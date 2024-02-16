@@ -261,13 +261,24 @@ def countStarts():
     os.chmod('runCounts.sh', 0o0777)
     
 def cleanUp():
-    pass
+    with open('clean.jtf', 'w') as submit:
+        submit.write( "Universe                 = local\n" )
+        submit.write( "Executable               = runClean.sh\n" )
+        submit.write( "Error                    = log/clean$(job).submit.err\n" )
+        submit.write( "Log                      = log/clean$(job).submit.log\n" )     
+        submit.write( "Queue" )
+    submit.close()
 
-def writeReadMe():
-    pass
-
-def writeCitations():
-    pass
+    with open('runClean.sh', 'w') as out:
+        out.write("#!/bin/bash\n")                                             # set shell
+        out.write("source /opt/bifxapps/miniconda3/etc/profile.d/conda.sh\n")  # add conda to path
+        out.write("unset $PYTHONPATH\n")                                       # remove default PYTHONPATH         
+        out.write("conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq\n")  # start up environment 
+        out.write("/home/glbrc.org/mplace/scripts/riboSeqPipeline/cleanUp.py\n")
+        out.write("conda deactivate\n")
+    out.close()
+    
+    os.chmod('runClean.sh', 0o0777)    # change file permissions to run
 
 def main():
     
@@ -377,6 +388,12 @@ def main():
         countJob.add_parent(alignJob)
         mydag.add_job(countJob)
         num += 1
+        
+    # LAST JOB
+    finalJob = Job('clean.jtf', 'final_node')       # set up directory clean up
+    finalJob.pre_skip("1")
+    finalJob.add_var('job', num)
+    mydag.add_job(finalJob)
             
     mydag.save('MasterDagman.dsf')      # write the dag submit file
     
@@ -386,7 +403,12 @@ def main():
     runRemoveFirst()
     alignNonCoding()
     alignBowtie() 
-    countStarts()         
+    countStarts() 
+    cleanUp()        
+    
+    # Submit job to condor
+    subprocess.Popen(['condor_submit_dag', 'MasterDagman.dsf'])
+
 
 if __name__ == "__main__":
     main()
