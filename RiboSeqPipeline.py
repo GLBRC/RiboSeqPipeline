@@ -84,7 +84,6 @@ def runFastqc():
                 submit.write( "Arguments                = $(fastqFile)\n")
                 submit.write( "Error                    = log/fastqc.$(job).err\n")
                 submit.write( "Log                      = log/fastqc.$(job).log\n")  
-                submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
                 submit.write( "Queue\n" )
     submit.close()  
 
@@ -120,7 +119,6 @@ def runCutAdapt():
         submit.write( "Arguments                = $(infastq) $(outfastq)\n")
         submit.write( "Error                    = log/cutadapt-$(job).submit.err\n")
         submit.write( "Log                      = log/cutadapt-$(job).submit.log\n")  
-        submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
         submit.write( "Queue\n" )
     submit.close()
 
@@ -147,7 +145,6 @@ def runRemoveFirst():
                 submit.write( "Arguments                = $(cleanFastq)\n")
                 submit.write( "Error                    = log/rmFirst.$(job).err\n")
                 submit.write( "Log                      = log/rmFirst.$(job).log\n")  
-                submit.write( "Requirements             = OpSysandVer == \"CentOS7\"\n")
                 submit.write( "Queue\n" )
     submit.close()  
 
