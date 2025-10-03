@@ -5,9 +5,9 @@ Generate tables of read start counts for Ribo-Seq data.
 ## Getting started
 
 Pipeline is designed to be run using GLBRC's HTCondor compute cluster.
-After logging into scarcity-submit activate the riboSeq conda environment.
+After logging into compute cluster activate the riboSeq conda environment.
 
-conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq
+conda activate riboSeq
 
 Please run this pipeline in a dedicated directory and create a subdirectory
 called fastq. Put all of your Read 1 (fwd) fastq files in this directory.
@@ -23,42 +23,46 @@ MyProject/ -> fastq/*R1.fastq
 RiboSeqPipeline.py -f fastqFiles.txt
 
 ## Results
-The following directories will be created:
- 
- alignments  -- alignment to reference genome results (.sam files)
+    The following directories will be created:
+    
+    alignments  -- alignment to reference genome results (.sam files)
 
- alignNonCodingRNA -- filtering step, alignment of intial fastq to Non-Coding RNA.
+    alignNonCodingRNA -- filtering step, alignment of intial fastq to Non-Coding RNA.
 
- condor    -- condor files
+    condor    -- condor files
 
- cutadapt  -- fastq files filtered with cutadapt and have additionally had the 1st base
-              removed if quality score <= 10.
+    cutadapt  -- fastq files filtered with cutadapt and have additionally had the 1st base
+                removed if quality score <= 10.
 
- log       -- log files for each step
+    log       -- log files for each step
 
- results   -- contain the count tables for each sample.
+    results   -- contain the count tables for each sample.
 
  ## Requirements
 
- See RiboSeq_condaEnv.yml
+    See RiboSeq_condaEnv.yml
 
- Pipeline designed to run as HTCondor Dagman job.
+    Pipeline designed to run as HTCondor Dagman job.
 
- A bowtie2 built reference genome.
+    A bowtie2 built reference genome.  See RiboSeqPipeline.py to change reference location.
+
+ ## Build conda environment
+
+    conda env create -f RiboSeq_condaEnv.yml
 
  ## List of scripts for pipeline
 
-cleanUp.py  
+    cleanUp.py  
 
-CountRiboStarts.py  
+    CountRiboStarts.py  
 
-CreateGeneBed.py  
+    CreateGeneBed.py  
 
-removeFirstBase.py  
+    removeFirstBase.py  
 
-RiboSeqPipeline.py  
+    RiboSeqPipeline.py  
 
-runFastqc.py
+    runFastqc.py
 
 ## Post pipeline script
 
