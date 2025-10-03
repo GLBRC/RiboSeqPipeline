@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""RiboSeqPipeline.py
+"""CreateGeneBed.py
 
 Pipeline to align and count start sites for Ribo-Seq data.
 
