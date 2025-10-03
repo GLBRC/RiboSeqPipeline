@@ -4,7 +4,7 @@ Generate tables of read start counts for Ribo-Seq data.
 
 ## Getting started
 
-Pipeline is designed to be run using GLBRC's scarcity-submit node.
+Pipeline is designed to be run using GLBRC's HTCondor compute cluster.
 After logging into scarcity-submit activate the riboSeq conda environment.
 
 conda activate /home/glbrc.org/mplace/.conda/envs/riboSeq
@@ -20,7 +20,7 @@ MyProject/ -> fastq/*R1.fastq
 
 ## Running the Pipeline
 
-/home/glbrc.org/mplace/scripts/riboSeqPipeline/RiboSeqPipeline.py -f fastqFiles.txt
+RiboSeqPipeline.py -f fastqFiles.txt
 
 ## Results
 The following directories will be created:
@@ -37,12 +37,17 @@ The following directories will be created:
  log       -- log files for each step
 
  results   -- contain the count tables for each sample.
+
+ ## Requirements
+
+ See RiboSeq_condaEnv.yml
+
+ Pipeline designed to run as HTCondor Dagman job.
  
 *******************************************************************************
 
 
-
-## Preliminary pipeline using Jupyter Notebook (do not use.)
+## Preliminary pipeline for development and testing using Jupyter Notebook (do not use.)
 
 Designed used with MicroSoft VS Code and to be used with on GLBRC scarcity with HTCondor.  
 
@@ -64,14 +69,11 @@ Designed used with MicroSoft VS Code and to be used with on GLBRC scarcity with 
 
 8) Try to use my riboSeq conda environment in VS Code.
 
-/home/glbrc.org/mplace/.conda/envs/riboSeq
-
  If this doesn't work used conda to create your own conda riboSeq environment.
  Use this file: RiboSeq_condaEnv.yml  located in the git repo.
 
  Edit the last line in the yml file to reflect your directory.
- prefix: /home/glbrc.org/mplace/.conda/envs/riboSeq should become ->
-        prefix: /home/glbrc.org/USER/.conda/envs/riboSeq
+ prefix: /home/glbrc.org/USER/.conda/envs/riboSeq
 
  Then to create the environment:  conda create -f RiboSeq_condaEnv.yml
  This can then be used within your VS Code. 
