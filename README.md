@@ -43,6 +43,8 @@ The following directories will be created:
  See RiboSeq_condaEnv.yml
 
  Pipeline designed to run as HTCondor Dagman job.
+
+ A bowtie2 built reference genome.
  
 *******************************************************************************
 
