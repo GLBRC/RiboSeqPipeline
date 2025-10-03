@@ -18,11 +18,17 @@ Generate tables of read start counts for Ribo-Seq data.
 
     MyProject/ -> fastq/*R1.fastq
 
-    Paths to conda env will need to be adjusted in the RiboSeqPipeline.py file.
+    Paths in files which you will have to change: 
+    1) conda env in RiboSeqPipeline.py file.
+    
+    2) reference genome sizes and reference bed in CountRiboStarts.py.
+    
+    3) GFF file path in CreateGeneBed.py 
+    
 
 ## Running the Pipeline
 
-RiboSeqPipeline.py -f fastqFiles.txt
+    RiboSeqPipeline.py -f fastqFiles.txt
 
 ## Results
     The following directories will be created:
