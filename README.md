@@ -18,6 +18,8 @@ ls fastq > fastqFiles.txt
 
 MyProject/ -> fastq/*R1.fastq
 
+Paths to conda env will need to be adjusted in the RiboSeqPipeline.py file.
+
 ## Running the Pipeline
 
 RiboSeqPipeline.py -f fastqFiles.txt
